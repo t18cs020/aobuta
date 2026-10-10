@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>青ブタ 履歴メモ</title>
+<style>
+:root{
+  --bg:#f3f7fb;--panel:#ffffff;--ink:#1d2b3a;--sub:#5d6f82;--line:#cfdbe8;--accent:#2a7fc9;--accent-ink:#fff;--del:#c0463d;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121a23;--panel:#1b2631;--ink:#e6eef6;--sub:#93a6b9;--line:#33465a;--accent:#5aa9e6;--accent-ink:#0c1822;--del:#e87b72}}
+:root[data-theme="dark"]{--bg:#121a23;--panel:#1b2631;--ink:#e6eef6;--sub:#93a6b9;--line:#33465a;--accent:#5aa9e6;--accent-ink:#0c1822;--del:#e87b72}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Yu Gothic",Meiryo,sans-serif;line-height:1.5}
+main{max-width:960px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+h1{font-size:1.3rem;margin:0}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 14px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.row{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.no{min-width:2.2em;color:var(--sub);font-variant-numeric:tabular-nums}
+.fields{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1}
+.fields>span.lbl{color:var(--sub);white-space:nowrap}
+.fld{display:inline-flex;align-items:center;gap:4px}
+select,input[type=text]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);max-width:100%}
+input[type=text]{width:6em;text-align:right}
+input.n3{width:5em}input.n5{width:7em}
+.del{color:var(--del);padding:6px 10px;flex:none}
+.empty{color:var(--sub);text-align:center;padding:32px 0;border:1px dashed var(--line);border-radius:8px}
+.btns{display:flex;gap:8px}
+#result{display:flex;flex-direction:column;gap:12px}
+#result img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff;align-self:flex-start}
+#result .acts{display:flex;gap:8px;flex-wrap:wrap}
+#note{color:var(--sub);margin:0}
+@media (max-width:560px){.row{align-items:flex-start}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>履歴</h1>
+  <div class="btns"><button class="primary" id="add" type="button">履歴を追加</button><button id="finish" type="button">終了</button></div>
+</header>
+<ol id="list"></ol>
+<div class="empty" id="empty">「履歴を追加」を押すと行が追加されます</div>
+<section id="result" hidden>
+  <img id="shot" alt="履歴一覧の画像">
+  <div class="acts"><button class="primary" id="save" type="button">画像を保存</button><button id="back" type="button">編集に戻る</button></div>
+  <p id="note" aria-live="polite"></p>
+</section>
+</main>
+<script>
+const MAIN=["CZ当選","AT終了","アイキャッチ","クリスタル変化","上位CZ","ドリームコレクション","ST開始時：思春期症候群"];
+const HEROINE=["朋絵","のどか","理央","麻衣","かえで","翔子"];
+const SF=["成功","失敗"];
+const LAST=["最終G","最終G以外"];
+const ROLE=["その他","ベル","リプレイ","チェリー","スイカ","チャンス目","観測目"];
+const END=["咲太（デフォ）","朋絵（偶数示唆）","のどか（奇数示唆）","理央（高設定示唆弱）","麻衣（高設定示唆強）","かえで（吉）","翔子（良）","バニー麻衣（優）","全員集合（極）"];
+const EYE=["咲太",...HEROINE,"ヒロイン集合","タイトル青","タイトル赤"];
+const CRYSTAL=["緑","赤",...HEROINE];
+const DREAM=["咲太「はりきって行くぞ」","咲太「調子上がってきたな」","麻衣「咲太には～」"];
+
+const list=document.getElementById("list"),empty=document.getElementById("empty");
+
+function el(tag,props,...kids){const e=document.createElement(tag);Object.assign(e,props||{});kids.forEach(k=>e.append(k));return e}
+function select(opts){const s=el("select");opts.forEach(o=>s.append(el("option",{value:o,textContent:o})));return s}
+function num(max,cls){
+  const i=el("input",{type:"text",inputMode:"numeric",maxLength:max,className:cls||"",autocomplete:"off"});
+  i.addEventListener("input",()=>{i.value=i.value.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/\D/g,"").slice(0,max)});
+  return i;
+}
+function wrap(left,ctl,right){
+  const w=el("span",{className:"fld"});
+  if(left)w.append(el("span",{textContent:left}));
+  w.append(ctl);
+  if(right)w.append(el("span",{textContent:right}));
+  return w;
+}
+
+function successGroup(withSakuta){
+  // 成功時のみ表示する要素
+  const g=el("span",{className:"fld",hidden:true});
+  const last=select(withSakuta?[...LAST,"咲太ポイント解放"]:LAST),role=select(ROLE);
+  const sync=()=>{role.hidden=last.value==="咲太ポイント解放"};
+  last.addEventListener("change",sync);sync();
+  g.append(last,role);
+  return g;
+}
+function sfWithDetail(box,withSakuta){
+  const sf=select(SF),g=successGroup(withSakuta);
+  const sync=()=>{g.hidden=sf.value!=="成功"};
+  sf.addEventListener("change",sync);sync();
+  box.append(sf,g);
+}
+
+const builders={
+  "ST開始時：思春期症候群":()=>{},
+  "CZ当選":b=>{b.append(select(HEROINE),wrap("",num(4),"pt"));sfWithDetail(b,true)},
+  "AT終了":b=>{b.append(wrap("V×",num(3,"n3"),""),wrap("",num(5,"n5"),"枚"),wrap("終了画面：",select(END),""))},
+  "アイキャッチ":b=>{b.append(select(EYE),wrap("",num(4),"pt"))},
+  "クリスタル変化":b=>{b.append(select(CRYSTAL),wrap("",num(4),"pt"))},
+  "上位CZ":b=>{sfWithDetail(b)},
+  "ドリームコレクション":b=>{b.append(wrap("突入時",num(4),"pt"),wrap("+",num(4),"pt"),wrap("終了時",select(DREAM),""))}
+};
+
+function renumber(){
+  [...list.children].forEach((li,i)=>li.querySelector(".no").textContent=(i+1)+".");
+  empty.hidden=list.children.length>0;
+}
+
+function addRow(){
+  const li=el("li",{className:"row"});
+  const no=el("span",{className:"no"});
+  const fields=el("div",{className:"fields"});
+  const main=select(MAIN);
+  const extra=el("span",{className:"fields",style:"display:contents"});
+  const render=()=>{extra.replaceChildren();builders[main.value](extra)};
+  main.addEventListener("change",render);
+  render();
+  fields.append(main,extra);
+  const del=el("button",{type:"button",className:"del",textContent:"削除",ariaLabel:"この履歴を削除"});
+  del.addEventListener("click",()=>{li.remove();renumber()});
+  li.append(no,fields,del);
+  list.append(li);
+  renumber();
+}
+document.getElementById("add").addEventListener("click",addRow);
+renumber();
+
+/* ---- 終了：ラベル化して画像保存 ---- */
+let dl=null,canvas=null;
+if(window.claude&&claude.use)claude.use("downloads").then(d=>{dl=d}).catch(()=>{});
+const $=id=>document.getElementById(id);
+
+function labelOf(n){
+  if(n.hidden)return "";
+  if(n.tagName==="SELECT")return n.value;
+  if(n.tagName==="INPUT")return n.value||"-";
+  if(!n.children.length)return n.textContent;
+  const kids=[...n.children].map(labelOf).filter(Boolean);
+  const joint=n.classList.contains("fld")&&n.querySelectorAll("select").length<2?"":" ";
+  return kids.join(joint);
+}
+function collect(){return [...list.children].map((li,i)=>(i+1)+". "+labelOf(li.querySelector(".fields")))}
+
+function draw(lines){
+  const W=800,pad=28,fs=22,lh=34,font='"Hiragino Sans","Yu Gothic",Meiryo,sans-serif';
+  const m=document.createElement("canvas").getContext("2d");m.font=fs+"px "+font;
+  const rows=lines.map(t=>{const out=[];let cur="";for(const ch of t){if(m.measureText(cur+ch).width>W-pad*2-(out.length?24:0)){out.push(cur);cur=ch}else cur+=ch}out.push(cur);return out});
+  const total=rows.reduce((a,r)=>a+r.length,0);
+  const H=pad*2+50+total*lh+rows.length*10;
+  const c=document.createElement("canvas"),s=2;c.width=W*s;c.height=H*s;
+  const x=c.getContext("2d");x.scale(s,s);
+  x.fillStyle="#fff";x.fillRect(0,0,W,H);
+  x.fillStyle="#1d2b3a";x.textBaseline="middle";
+  x.font="bold 26px "+font;x.fillText("履歴",pad,pad+14);
+  let y=pad+50;x.font=fs+"px "+font;
+  rows.forEach((r,i)=>{
+    r.forEach((t,j)=>{x.fillStyle="#1d2b3a";x.fillText(t,pad+(j?24:0),y+lh/2);y+=lh});
+    y+=10;
+    if(i<rows.length-1){x.fillStyle="#cfdbe8";x.fillRect(pad,y-5,W-pad*2,1)}
+  });
+  return c;
+}
+
+$("finish").addEventListener("click",()=>{
+  const lines=collect();
+  if(!lines.length){alert("履歴がありません。先に「履歴を追加」を押してください。");return}
+  canvas=draw(lines);
+  $("shot").src=canvas.toDataURL("image/png");
+  $("save").hidden=!dl;
+  $("note").textContent=dl?"":"この環境では保存ボタンを使えません。画像を長押し（右クリック）して保存してください。";
+  list.hidden=true;empty.hidden=true;$("add").hidden=true;$("finish").hidden=true;$("result").hidden=false;
+});
+$("back").addEventListener("click",()=>{
+  $("result").hidden=true;list.hidden=false;$("add").hidden=false;$("finish").hidden=false;renumber();
+});
+$("save").addEventListener("click",()=>{
+  if(!canvas||!dl)return;
+  canvas.toBlob(async b=>{
+    try{await dl.save({filename:"aobuta-history.png",data:b});$("note").textContent="保存しました。"}
+    catch(e){if(e&&e.code!=="declined")$("note").textContent="保存できませんでした。画像を長押し（右クリック）して保存してください。"}
+  },"image/png");
+});
+</script>
+</body>
+</html>
