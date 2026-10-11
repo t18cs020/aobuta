@@ -37,14 +37,32 @@ input.n3{width:5em}input.n5{width:7em}
 #result img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff;align-self:flex-start}
 #result .acts{display:flex;gap:8px;flex-wrap:wrap}
 #note{color:var(--sub);margin:0}
-@media (max-width:560px){.row{align-items:flex-start}}
+@media (max-width:600px){
+  main{padding:8px 12px 40px}
+  header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:8px 0;margin:0 0 8px}
+  h1{font-size:1.1rem}
+  .btns{width:100%}
+  .btns button{flex:1}
+  button,select,input[type=text]{min-height:44px;font-size:16px}
+  .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px}
+  .no{grid-column:1;grid-row:1}
+  .del{grid-column:3;grid-row:1}
+  .fields{grid-column:1/-1;grid-row:2}
+  .fields>select{flex:1 1 40%;min-width:0}
+  .fld{flex:1 1 auto}
+  .fld select{flex:1;min-width:0}
+  input[type=text]{width:5.5em}
+  input.n3{width:4.5em}
+  input.n5{width:6.5em}
+  #result .acts button{flex:1}
+}
 </style>
 </head>
 <body>
 <main>
 <header>
   <h1>履歴</h1>
-  <div class="btns"><button class="primary" id="add" type="button">履歴を追加</button><button id="finish" type="button">終了</button></div>
+  <div class="btns"><button class="primary" id="add" type="button">履歴を追加</button><button id="finish" type="button">終了</button><button id="clear" type="button">全消去</button></div>
 </header>
 <ol id="list"></ol>
 <div class="empty" id="empty">「履歴を追加」を押すと行が追加されます</div>
@@ -124,12 +142,49 @@ function addRow(){
   render();
   fields.append(main,extra);
   const del=el("button",{type:"button",className:"del",textContent:"削除",ariaLabel:"この履歴を削除"});
-  del.addEventListener("click",()=>{li.remove();renumber()});
+  del.addEventListener("click",()=>{li.remove();renumber();save()});
   li.append(no,fields,del);
   list.append(li);
   renumber();
+  save();
 }
 document.getElementById("add").addEventListener("click",addRow);
+
+/* ---- 自動保存（localStorage） ---- */
+const KEY="aobuta-history-v1";let restoring=false;
+function save(){
+  if(restoring)return;
+  try{localStorage.setItem(KEY,JSON.stringify([...list.children].map(li=>[...li.querySelectorAll("select,input")].map(c=>c.value))))}catch(e){}
+}
+list.addEventListener("input",save);
+list.addEventListener("change",save);
+function restore(){
+  let data=null;
+  try{data=JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){}
+  if(!Array.isArray(data))return;
+  restoring=true;
+  data.forEach(vals=>{
+    if(!Array.isArray(vals)||!MAIN.includes(vals[0]))return;
+    addRow();
+    const li=list.lastElementChild,main=li.querySelector("select");
+    main.value=vals[0];main.dispatchEvent(new Event("change"));
+    const ctrls=[...li.querySelectorAll("select,input")];
+    vals.forEach((v,i)=>{
+      const c=ctrls[i];if(!c||i===0)return;
+      if(c.tagName==="SELECT"){
+        if([...c.options].some(o=>o.value===v)){c.value=v;c.dispatchEvent(new Event("change"))}
+      }else c.value=String(v).replace(/\D/g,"").slice(0,c.maxLength);
+    });
+  });
+  restoring=false;
+}
+restore();
+let armed=null;const clr=document.getElementById("clear");
+clr.addEventListener("click",()=>{
+  if(!armed){clr.textContent="もう一度押して消去";armed=setTimeout(()=>{armed=null;clr.textContent="全消去"},3000);return}
+  clearTimeout(armed);armed=null;clr.textContent="全消去";
+  list.replaceChildren();renumber();save();
+});
 renumber();
 
 /* ---- 終了：ラベル化して画像保存 ---- */
@@ -175,10 +230,10 @@ $("finish").addEventListener("click",()=>{
   $("shot").src=canvas.toDataURL("image/png");
   $("save").hidden=!dl;
   $("note").textContent=dl?"":"この環境では保存ボタンを使えません。画像を長押し（右クリック）して保存してください。";
-  list.hidden=true;empty.hidden=true;$("add").hidden=true;$("finish").hidden=true;$("result").hidden=false;
+  list.hidden=true;empty.hidden=true;document.querySelector(".btns").hidden=true;$("result").hidden=false;
 });
 $("back").addEventListener("click",()=>{
-  $("result").hidden=true;list.hidden=false;$("add").hidden=false;$("finish").hidden=false;renumber();
+  $("result").hidden=true;list.hidden=false;document.querySelector(".btns").hidden=false;renumber();
 });
 $("save").addEventListener("click",()=>{
   if(!canvas||!dl)return;
