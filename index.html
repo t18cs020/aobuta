@@ -32,6 +32,13 @@ input[type=text]{width:6em;text-align:right}
 input.n3{width:5em}input.n5{width:7em}
 .del{color:var(--del);padding:6px 10px;flex:none}
 .empty{color:var(--sub);text-align:center;padding:32px 0;border:1px dashed var(--line);border-radius:8px}
+input[type=text].memo{flex:1 1 14em;width:min(32em,100%);text-align:left}
+#counters{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px}
+.rt{color:var(--sub);font-size:.85rem}
+.cnt{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.cnt .cl{flex:1;font-size:.9rem}
+.cnt .n{min-width:2.5em;text-align:center;font-weight:700;font-size:1.2rem;font-variant-numeric:tabular-nums}
+.cnt button{min-width:44px;padding:6px 0}
 .btns{display:flex;gap:8px}
 #result{display:flex;flex-direction:column;gap:12px}
 #result img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff;align-self:flex-start}
@@ -54,6 +61,8 @@ input.n3{width:5em}input.n5{width:7em}
   input[type=text]{width:5.5em}
   input.n3{width:4.5em}
   input.n5{width:6.5em}
+  #counters{grid-template-columns:1fr}
+  .cnt.g2{margin-top:8px}
   #result .acts button{flex:1}
 }
 </style>
@@ -64,6 +73,7 @@ input.n3{width:5em}input.n5{width:7em}
   <h1>履歴</h1>
   <div class="btns"><button class="primary" id="add" type="button">履歴を追加</button><button id="finish" type="button">終了</button><button id="clear" type="button">全消去</button></div>
 </header>
+<section id="counters" aria-label="カウンター"></section>
 <ol id="list"></ol>
 <div class="empty" id="empty">「履歴を追加」を押すと行が追加されます</div>
 <section id="result" hidden>
@@ -73,7 +83,7 @@ input.n3{width:5em}input.n5{width:7em}
 </section>
 </main>
 <script>
-const MAIN=["CZ当選","AT終了","アイキャッチ","クリスタル変化","上位CZ","ドリームコレクション","ST開始時：思春期症候群"];
+const MAIN=["CZ当選","AT終了","アイキャッチ","クリスタル変化","上位CZ","ドリームコレクション","ST開始時：思春期症候群","その他"];
 const HEROINE=["朋絵","のどか","理央","麻衣","かえで","翔子"];
 const SF=["成功","失敗"];
 const LAST=["最終G","最終G以外"];
@@ -118,6 +128,7 @@ function sfWithDetail(box,withSakuta){
 
 const builders={
   "ST開始時：思春期症候群":()=>{},
+  "その他":b=>{b.append(el("input",{type:"text",className:"memo",maxLength:200,placeholder:"内容（200文字まで）",autocomplete:"off"}))},
   "CZ当選":b=>{b.append(select(HEROINE),wrap("",num(4),"pt"));sfWithDetail(b,true)},
   "AT終了":b=>{b.append(wrap("V×",num(3,"n3"),""),wrap("",num(5,"n5"),"枚"),wrap("終了画面：",select(END),""))},
   "アイキャッチ":b=>{b.append(select(EYE),wrap("",num(4),"pt"))},
@@ -173,17 +184,42 @@ function restore(){
       const c=ctrls[i];if(!c||i===0)return;
       if(c.tagName==="SELECT"){
         if([...c.options].some(o=>o.value===v)){c.value=v;c.dispatchEvent(new Event("change"))}
-      }else c.value=String(v).replace(/\D/g,"").slice(0,c.maxLength);
+      }else c.value=c.classList.contains("memo")?String(v).slice(0,200):String(v).replace(/\D/g,"").slice(0,c.maxLength);
     });
   });
   restoring=false;
 }
 restore();
+
+/* ---- カウンター ---- */
+const COUNTS=[["cherry","弱チェリー"],["cherryWin","弱チェリーからアオハルチャンス当選"],["chance","チャンス目"],["chanceWin","チャンス目からアオハルチャンス当選"]];
+const PAIRS={cherryWin:"cherry",chanceWin:"chance"};
+const CKEY="aobuta-counts-v1";let counts={};
+try{counts=JSON.parse(localStorage.getItem(CKEY)||"{}")||{}}catch(e){counts={}}
+COUNTS.forEach(([k])=>{counts[k]=Math.max(0,parseInt(counts[k])||0)});
+const cbox=document.getElementById("counters"),cnum={},rateEls={};
+function saveCounts(){try{localStorage.setItem(CKEY,JSON.stringify(counts))}catch(e){}}
+COUNTS.forEach(([k,name])=>{
+  const n=el("span",{className:"n",textContent:counts[k]});cnum[k]=n;
+  const minus=el("button",{type:"button",textContent:"−",ariaLabel:name+"を減らす"});
+  const plus=el("button",{type:"button",className:"primary",textContent:"+",ariaLabel:name+"を増やす"});
+  const step=d=>{counts[k]=Math.max(0,counts[k]+d);n.textContent=counts[k];saveCounts();paintRates()};
+  minus.addEventListener("click",()=>step(-1));plus.addEventListener("click",()=>step(1));
+  const cl=el("span",{className:"cl",textContent:name});
+  if(PAIRS[k]){const r=el("span",{className:"rt"});rateEls[k]=r;cl.append(el("br"),r)}
+  cbox.append(el("div",{className:"cnt"+(k==="chance"?" g2":"")},cl,minus,n,plus));
+});
+function rateText(k){const t=counts[PAIRS[k]];return t?(counts[k]/t*100).toFixed(1)+"%":"-"}
+function paintRates(){for(const k in rateEls)rateEls[k].textContent="当選率 "+rateText(k)}
+function resetCounts(){COUNTS.forEach(([k])=>{counts[k]=0;cnum[k].textContent=0});saveCounts();paintRates()}
+paintRates();
+function countLines(){return ["【カウント】",...COUNTS.map(([k,n])=>n+"："+counts[k]+"回"+(PAIRS[k]?"（当選率 "+rateText(k)+"）":"")),"【履歴】"]}
+
 let armed=null;const clr=document.getElementById("clear");
 clr.addEventListener("click",()=>{
   if(!armed){clr.textContent="もう一度押して消去";armed=setTimeout(()=>{armed=null;clr.textContent="全消去"},3000);return}
   clearTimeout(armed);armed=null;clr.textContent="全消去";
-  list.replaceChildren();renumber();save();
+  list.replaceChildren();renumber();save();resetCounts();
 });
 renumber();
 
@@ -226,14 +262,14 @@ function draw(lines){
 $("finish").addEventListener("click",()=>{
   const lines=collect();
   if(!lines.length){alert("履歴がありません。先に「履歴を追加」を押してください。");return}
-  canvas=draw(lines);
+  canvas=draw([...countLines(),...lines]);
   $("shot").src=canvas.toDataURL("image/png");
   $("save").hidden=!dl;
   $("note").textContent=dl?"":"この環境では保存ボタンを使えません。画像を長押し（右クリック）して保存してください。";
-  list.hidden=true;empty.hidden=true;document.querySelector(".btns").hidden=true;$("result").hidden=false;
+  list.hidden=true;empty.hidden=true;document.querySelector(".btns").hidden=true;$("counters").hidden=true;$("result").hidden=false;
 });
 $("back").addEventListener("click",()=>{
-  $("result").hidden=true;list.hidden=false;document.querySelector(".btns").hidden=false;renumber();
+  $("result").hidden=true;list.hidden=false;document.querySelector(".btns").hidden=false;$("counters").hidden=false;renumber();
 });
 $("save").addEventListener("click",()=>{
   if(!canvas||!dl)return;
