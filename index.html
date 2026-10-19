@@ -39,6 +39,7 @@ input[type=text].memo{flex:1 1 14em;width:min(32em,100%);text-align:left}
 .cnt .cl{flex:1;font-size:.9rem}
 .cnt .n{min-width:2.5em;text-align:center;font-weight:700;font-size:1.2rem;font-variant-numeric:tabular-nums}
 .cnt button{min-width:44px;padding:6px 0}
+.row{scroll-margin-bottom:16px}
 .btns{display:flex;gap:8px}
 #result{display:flex;flex-direction:column;gap:12px}
 #result img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff;align-self:flex-start}
@@ -83,7 +84,7 @@ input[type=text].memo{flex:1 1 14em;width:min(32em,100%);text-align:left}
 </section>
 </main>
 <script>
-const MAIN=["CZ当選","AT終了","アイキャッチ","クリスタル変化","上位CZ","ドリームコレクション","ST開始時：思春期症候群","その他"];
+const MAIN=["CZ当選","AT終了","アイキャッチ","クリスタル変化","上位CZ","ドリームコレクション","ST開始時：思春期症候群","咲太クエスト","その他"];
 const HEROINE=["朋絵","のどか","理央","麻衣","かえで","翔子"];
 const SF=["成功","失敗"];
 const LAST=["最終G","最終G以外"];
@@ -97,6 +98,12 @@ const list=document.getElementById("list"),empty=document.getElementById("empty"
 
 function el(tag,props,...kids){const e=document.createElement(tag);Object.assign(e,props||{});kids.forEach(k=>e.append(k));return e}
 function select(opts){const s=el("select");opts.forEach(o=>s.append(el("option",{value:o,textContent:o})));return s}
+function ptSel(){
+  const s=el("select");
+  for(let v=100;v<=1000;v+=100)s.append(el("option",{value:String(v),textContent:v+"pt"}));
+  ["CZ間実ゲーム数天井","アオハルCHANCE"].forEach(t=>s.append(el("option",{value:t,textContent:t})));
+  return s;
+}
 function num(max,cls){
   const i=el("input",{type:"text",inputMode:"numeric",maxLength:max,className:cls||"",autocomplete:"off"});
   i.addEventListener("input",()=>{i.value=i.value.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/\D/g,"").slice(0,max)});
@@ -128,8 +135,9 @@ function sfWithDetail(box,withSakuta){
 
 const builders={
   "ST開始時：思春期症候群":()=>{},
+  "咲太クエスト":b=>{b.append(select(["ベル","スイカ","チェリー","チャンス目"]))},
   "その他":b=>{b.append(el("input",{type:"text",className:"memo",maxLength:200,placeholder:"内容（200文字まで）",autocomplete:"off"}))},
-  "CZ当選":b=>{b.append(select(HEROINE),wrap("",num(4),"pt"));sfWithDetail(b,true)},
+  "CZ当選":b=>{b.append(select(HEROINE),ptSel());sfWithDetail(b,true)},
   "AT終了":b=>{b.append(wrap("V×",num(3,"n3"),""),wrap("",num(5,"n5"),"枚"),wrap("終了画面：",select(END),""))},
   "アイキャッチ":b=>{b.append(select(EYE),wrap("",num(4),"pt"))},
   "クリスタル変化":b=>{b.append(select(CRYSTAL),wrap("",num(4),"pt"))},
@@ -159,7 +167,10 @@ function addRow(){
   renumber();
   save();
 }
-document.getElementById("add").addEventListener("click",addRow);
+document.getElementById("add").addEventListener("click",()=>{
+  addRow();
+  list.lastElementChild.scrollIntoView({behavior:"smooth",block:"nearest"});
+});
 
 /* ---- 自動保存（localStorage） ---- */
 const KEY="aobuta-history-v1";let restoring=false;
@@ -192,12 +203,12 @@ function restore(){
 restore();
 
 /* ---- カウンター ---- */
-const COUNTS=[["cherry","弱チェリー"],["cherryWin","弱チェリーからアオハルチャンス当選"],["chance","チャンス目"],["chanceWin","チャンス目からアオハルチャンス当選"]];
+const COUNTS=[["cherry","チェリー"],["cherryWin","チェリーからアオハルチャンス当選"],["chance","チャンス目"],["chanceWin","チャンス目からアオハルチャンス当選"]];
 const PAIRS={cherryWin:"cherry",chanceWin:"chance"};
 const CKEY="aobuta-counts-v1";let counts={};
 try{counts=JSON.parse(localStorage.getItem(CKEY)||"{}")||{}}catch(e){counts={}}
 COUNTS.forEach(([k])=>{counts[k]=Math.max(0,parseInt(counts[k])||0)});
-const cbox=document.getElementById("counters"),cnum={},rateEls={};
+const cbox=document.getElementById("counters"),cnum={},rateEls={},groups={};
 function saveCounts(){try{localStorage.setItem(CKEY,JSON.stringify(counts))}catch(e){}}
 COUNTS.forEach(([k,name])=>{
   const n=el("span",{className:"n",textContent:counts[k]});cnum[k]=n;
@@ -230,7 +241,7 @@ const $=id=>document.getElementById(id);
 
 function labelOf(n){
   if(n.hidden)return "";
-  if(n.tagName==="SELECT")return n.value;
+  if(n.tagName==="SELECT")return n.selectedOptions[0]?n.selectedOptions[0].text:n.value;
   if(n.tagName==="INPUT")return n.value||"-";
   if(!n.children.length)return n.textContent;
   const kids=[...n.children].map(labelOf).filter(Boolean);
