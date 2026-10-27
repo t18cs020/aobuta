@@ -15,7 +15,9 @@
 [hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Yu Gothic",Meiryo,sans-serif;line-height:1.5}
-main{max-width:960px;margin:0 auto;padding:20px 16px 48px}
+main{max-width:960px;margin:0 auto;padding:20px 16px 100px}
+#addbar{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;justify-content:center;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line)}
+#addbar button{width:100%;max-width:928px}
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 h1{font-size:1.3rem;margin:0}
 button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 14px}
@@ -34,19 +36,21 @@ input.n3{width:5em}input.n5{width:7em}
 .empty{color:var(--sub);text-align:center;padding:32px 0;border:1px dashed var(--line);border-radius:8px}
 input[type=text].memo{flex:1 1 14em;width:min(32em,100%);text-align:left}
 #counters{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px}
-.rt{color:var(--sub);font-size:.85rem}
-.cnt{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
-.cnt .cl{flex:1;font-size:.9rem}
+.rt{flex:0 0 100%;text-align:center;color:var(--sub);font-size:.85rem}
+.cnt{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.ci{display:flex;flex-direction:column;align-items:center;gap:6px}
+.cnt button.red{background:#d64545;border-color:#d64545;color:#fff}
+.cnt .cl{flex:none;align-self:center;font-weight:600;font-size:.95rem}
 .cnt .n{min-width:2.5em;text-align:center;font-weight:700;font-size:1.2rem;font-variant-numeric:tabular-nums}
 .cnt button{min-width:44px;padding:6px 0}
-.row{scroll-margin-bottom:16px}
+.row{scroll-margin-bottom:100px}
 .btns{display:flex;gap:8px}
 #result{display:flex;flex-direction:column;gap:12px}
 #result img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff;align-self:flex-start}
 #result .acts{display:flex;gap:8px;flex-wrap:wrap}
 #note{color:var(--sub);margin:0}
 @media (max-width:600px){
-  main{padding:8px 12px 40px}
+  main{padding:8px 12px 100px}
   header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:8px 0;margin:0 0 8px}
   h1{font-size:1.1rem}
   .btns{width:100%}
@@ -62,8 +66,10 @@ input[type=text].memo{flex:1 1 14em;width:min(32em,100%);text-align:left}
   input[type=text]{width:5.5em}
   input.n3{width:4.5em}
   input.n5{width:6.5em}
-  #counters{grid-template-columns:1fr}
-  .cnt.g2{margin-top:8px}
+  #counters{grid-template-columns:repeat(2,1fr)}
+  .cnt{padding:6px;gap:6px}
+  .cnt .cl{font-size:.75rem}
+  .cnt button{min-width:40px}
   #result .acts button{flex:1}
 }
 </style>
@@ -72,7 +78,7 @@ input[type=text].memo{flex:1 1 14em;width:min(32em,100%);text-align:left}
 <main>
 <header>
   <h1>履歴</h1>
-  <div class="btns"><button class="primary" id="add" type="button">履歴を追加</button><button id="finish" type="button">終了</button><button id="clear" type="button">全消去</button></div>
+  <div class="btns"><button id="finish" type="button">終了</button><button id="clear" type="button">全消去</button></div>
 </header>
 <section id="counters" aria-label="カウンター"></section>
 <ol id="list"></ol>
@@ -83,6 +89,7 @@ input[type=text].memo{flex:1 1 14em;width:min(32em,100%);text-align:left}
   <p id="note" aria-live="polite"></p>
 </section>
 </main>
+<div id="addbar"><button class="primary" id="add" type="button">履歴を追加</button></div>
 <script>
 const MAIN=["CZ当選","AT終了","アイキャッチ","クリスタル変化","上位CZ","ドリームコレクション","ST開始時：思春期症候群","咲太クエスト","その他"];
 const HEROINE=["朋絵","のどか","理央","麻衣","かえで","翔子"];
@@ -213,18 +220,19 @@ function saveCounts(){try{localStorage.setItem(CKEY,JSON.stringify(counts))}catc
 COUNTS.forEach(([k,name])=>{
   const n=el("span",{className:"n",textContent:counts[k]});cnum[k]=n;
   const minus=el("button",{type:"button",textContent:"−",ariaLabel:name+"を減らす"});
-  const plus=el("button",{type:"button",className:"primary",textContent:"+",ariaLabel:name+"を増やす"});
+  const plus=el("button",{type:"button",className:PAIRS[k]?"primary":"primary red",textContent:"+",ariaLabel:name+"を増やす"});
   const step=d=>{counts[k]=Math.max(0,counts[k]+d);n.textContent=counts[k];saveCounts();paintRates()};
   minus.addEventListener("click",()=>step(-1));plus.addEventListener("click",()=>step(1));
-  const cl=el("span",{className:"cl",textContent:name});
-  if(PAIRS[k]){const r=el("span",{className:"rt"});rateEls[k]=r;cl.append(el("br"),r)}
-  cbox.append(el("div",{className:"cnt"+(k==="chance"?" g2":"")},cl,minus,n,plus));
+  const gk=PAIRS[k]||k;let g=groups[gk];
+  if(!g){g=el("div",{className:"cnt"},el("span",{className:"cl",textContent:name}));groups[gk]=g;cbox.append(g)}
+  g.append(el("span",{className:"ci"},n,plus,minus));
+  if(PAIRS[k]){const r=el("span",{className:"rt"});rateEls[k]=r;g.append(r)}
 });
 function rateText(k){const t=counts[PAIRS[k]];return t?(counts[k]/t*100).toFixed(1)+"%":"-"}
-function paintRates(){for(const k in rateEls)rateEls[k].textContent="当選率 "+rateText(k)}
+function paintRates(){for(const k in rateEls)rateEls[k].textContent="AC当選率 "+rateText(k)}
 function resetCounts(){COUNTS.forEach(([k])=>{counts[k]=0;cnum[k].textContent=0});saveCounts();paintRates()}
 paintRates();
-function countLines(){return ["【カウント】",...COUNTS.map(([k,n])=>n+"："+counts[k]+"回"+(PAIRS[k]?"（当選率 "+rateText(k)+"）":"")),"【履歴】"]}
+function countLines(){return ["【カウント】",...COUNTS.map(([k,n])=>n+"："+counts[k]+"回"+(PAIRS[k]?"（AC当選率 "+rateText(k)+"）":"")),"【履歴】"]}
 
 let armed=null;const clr=document.getElementById("clear");
 clr.addEventListener("click",()=>{
@@ -277,10 +285,10 @@ $("finish").addEventListener("click",()=>{
   $("shot").src=canvas.toDataURL("image/png");
   $("save").hidden=!dl;
   $("note").textContent=dl?"":"この環境では保存ボタンを使えません。画像を長押し（右クリック）して保存してください。";
-  list.hidden=true;empty.hidden=true;document.querySelector(".btns").hidden=true;$("counters").hidden=true;$("result").hidden=false;
+  list.hidden=true;empty.hidden=true;document.querySelector(".btns").hidden=true;$("addbar").hidden=true;$("counters").hidden=true;$("result").hidden=false;
 });
 $("back").addEventListener("click",()=>{
-  $("result").hidden=true;list.hidden=false;document.querySelector(".btns").hidden=false;$("counters").hidden=false;renumber();
+  $("result").hidden=true;list.hidden=false;document.querySelector(".btns").hidden=false;$("addbar").hidden=false;$("counters").hidden=false;renumber();
 });
 $("save").addEventListener("click",()=>{
   if(!canvas||!dl)return;
