@@ -35,16 +35,22 @@ input.n3{width:5em}input.n5{width:7em}
 .del{color:var(--del);padding:6px 10px;flex:none}
 .empty{color:var(--sub);text-align:center;padding:32px 0;border:1px dashed var(--line);border-radius:8px}
 input[type=text].memo{flex:1 1 14em;width:min(32em,100%);text-align:left}
-#counters{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px}
+#counters{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:8px 0;margin-bottom:8px}
 .rt{flex:0 0 100%;text-align:center;color:var(--sub);font-size:.85rem}
 .cnt{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
 .ci{display:flex;flex-direction:column;align-items:center;gap:6px}
 .cnt button.red{background:#d64545;border-color:#d64545;color:#fff}
+.cnt button.purple{background:#8e5bd0;border-color:#8e5bd0;color:#fff}
 .cnt .cl{flex:0 0 100%;text-align:center;font-weight:600;font-size:.95rem}
 .cnt .n{min-width:2.5em;text-align:center;font-weight:700;font-size:1.2rem;font-variant-numeric:tabular-nums}
 .cnt button{min-width:44px;padding:6px 0}
 .row{scroll-margin-bottom:100px}
-.btns{display:flex;gap:8px}
+#stats{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+#stats h2{font-size:1rem;margin:0 0 6px}
+#stats small{display:block;margin-top:6px;color:var(--sub);font-size:.75rem}
+.st{display:grid;grid-template-columns:auto 1fr auto;gap:2px 16px;font-size:.9rem;font-variant-numeric:tabular-nums}
+.st .r{text-align:right;font-weight:600}
+.btns{display:flex;gap:8px;margin-top:16px}
 #result{display:flex;flex-direction:column;gap:12px}
 #result img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff;align-self:flex-start}
 #result .acts{display:flex;gap:8px;flex-wrap:wrap}
@@ -76,13 +82,15 @@ input[type=text].memo{flex:1 1 14em;width:min(32em,100%);text-align:left}
 </head>
 <body>
 <main>
-<header>
-  <h1>履歴</h1>
-  <div class="btns"><button id="finish" type="button">終了</button><button id="clear" type="button">全消去</button></div>
-</header>
 <section id="counters" aria-label="カウンター"></section>
 <ol id="list"></ol>
 <div class="empty" id="empty">「履歴を追加」を押すと行が追加されます</div>
+<section id="stats">
+  <h2>CZ pt別当選率</h2>
+  <div id="statsBody"></div>
+  <small>各ptの当選数 ÷ そのpt以上の当選数（低ptで当選した分を除く）。CZ間実ゲーム数天井・アオハルCHANCEは除外。</small>
+</section>
+<div class="btns"><button id="finish" type="button">終了</button><button id="clear" type="button">全消去</button></div>
 <section id="result" hidden>
   <img id="shot" alt="履歴一覧の画像">
   <div class="acts"><button class="primary" id="save" type="button">画像を保存</button><button id="back" type="button">編集に戻る</button></div>
@@ -181,8 +189,25 @@ document.getElementById("add").addEventListener("click",()=>{
 
 /* ---- 自動保存（localStorage） ---- */
 const KEY="aobuta-history-v1";let restoring=false;
+const PTS=[];for(let v=100;v<=1000;v+=100)PTS.push(v);
+function updateStats(){
+  const n={};PTS.forEach(p=>n[p]=0);
+  [...list.children].forEach(li=>{
+    const s=li.querySelectorAll("select");
+    if(s[0]&&s[0].value==="CZ当選"&&s[2]&&n[s[2].value]!==undefined)n[s[2].value]++;
+  });
+  const box=document.getElementById("statsBody");box.replaceChildren();
+  let rest=PTS.reduce((a,p)=>a+n[p],0);
+  const g=el("div",{className:"st"});
+  PTS.forEach(p=>{
+    g.append(el("span",{textContent:p+"pt"}),el("span",{textContent:n[p]+" / "+rest}),el("span",{className:"r",textContent:rest?(n[p]/rest*100).toFixed(1)+"%":"-"}));
+    rest-=n[p];
+  });
+  box.append(g);
+}
 function save(){
   if(restoring)return;
+  updateStats();
   try{localStorage.setItem(KEY,JSON.stringify([...list.children].map(li=>[...li.querySelectorAll("select,input")].map(c=>c.value))))}catch(e){}
 }
 list.addEventListener("input",save);
@@ -207,7 +232,7 @@ function restore(){
   });
   restoring=false;
 }
-restore();
+restore();updateStats();
 
 /* ---- カウンター ---- */
 const COUNTS=[["cherry","チェリー"],["cherryWin","チェリーからアオハルチャンス当選"],["chance","チャンス目"],["chanceWin","チャンス目からアオハルチャンス当選"]];
@@ -220,7 +245,7 @@ function saveCounts(){try{localStorage.setItem(CKEY,JSON.stringify(counts))}catc
 COUNTS.forEach(([k,name])=>{
   const n=el("span",{className:"n",textContent:counts[k]});cnum[k]=n;
   const minus=el("button",{type:"button",textContent:"−",ariaLabel:name+"を減らす"});
-  const plus=el("button",{type:"button",className:PAIRS[k]?"primary":"primary red",textContent:"+",ariaLabel:name+"を増やす"});
+  const plus=el("button",{type:"button",className:PAIRS[k]?"primary":"primary "+(k==="chance"?"purple":"red"),textContent:"+",ariaLabel:name+"を増やす"});
   const step=d=>{counts[k]=Math.max(0,counts[k]+d);n.textContent=counts[k];saveCounts();paintRates()};
   minus.addEventListener("click",()=>step(-1));plus.addEventListener("click",()=>step(1));
   const gk=PAIRS[k]||k;let g=groups[gk];
@@ -232,7 +257,12 @@ function rateText(k){const t=counts[PAIRS[k]];return t?(counts[k]/t*100).toFixed
 function paintRates(){for(const k in rateEls)rateEls[k].textContent="AC当選率 "+rateText(k)}
 function resetCounts(){COUNTS.forEach(([k])=>{counts[k]=0;cnum[k].textContent=0});saveCounts();paintRates()}
 paintRates();
-function countLines(){return ["【カウント】",...COUNTS.map(([k,n])=>n+"："+counts[k]+"回"+(PAIRS[k]?"（AC当選率 "+rateText(k)+"）":"")),"【履歴】"]}
+function statsLines(){
+  const c=[...document.querySelectorAll("#statsBody .st span")].map(s=>s.textContent),out=["【CZ pt別当選率】"];
+  for(let i=0;i<c.length;i+=3)out.push(c[i]+"："+c[i+1]+"（"+c[i+2]+"）");
+  return out;
+}
+function countLines(){return ["【カウント】",...COUNTS.map(([k,n])=>n+"："+counts[k]+"回"+(PAIRS[k]?"（AC当選率 "+rateText(k)+"）":"")),...statsLines(),"【履歴】"]}
 
 let armed=null;const clr=document.getElementById("clear");
 clr.addEventListener("click",()=>{
@@ -285,10 +315,10 @@ $("finish").addEventListener("click",()=>{
   $("shot").src=canvas.toDataURL("image/png");
   $("save").hidden=!dl;
   $("note").textContent=dl?"":"この環境では保存ボタンを使えません。画像を長押し（右クリック）して保存してください。";
-  list.hidden=true;empty.hidden=true;document.querySelector(".btns").hidden=true;$("addbar").hidden=true;$("counters").hidden=true;$("result").hidden=false;
+  list.hidden=true;empty.hidden=true;document.querySelector(".btns").hidden=true;$("addbar").hidden=true;$("stats").hidden=true;$("counters").hidden=true;$("result").hidden=false;
 });
 $("back").addEventListener("click",()=>{
-  $("result").hidden=true;list.hidden=false;document.querySelector(".btns").hidden=false;$("addbar").hidden=false;$("counters").hidden=false;renumber();
+  $("result").hidden=true;list.hidden=false;document.querySelector(".btns").hidden=false;$("addbar").hidden=false;$("stats").hidden=false;$("counters").hidden=false;renumber();
 });
 $("save").addEventListener("click",()=>{
   if(!canvas||!dl)return;
