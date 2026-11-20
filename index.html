@@ -35,7 +35,9 @@ input.n3{width:5em}input.n5{width:7em}
 .del{color:var(--del);padding:6px 10px;flex:none}
 .empty{color:var(--sub);text-align:center;padding:32px 0;border:1px dashed var(--line);border-radius:8px}
 input[type=text].memo{flex:1 1 14em;width:min(32em,100%);text-align:left}
-#counters{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:8px 0;margin-bottom:8px}
+#cdet{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:8px 0 4px;margin-bottom:8px}
+#cdet summary{cursor:pointer;font-weight:600;padding:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+#counters{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding-top:8px}
 .rt{flex:0 0 100%;text-align:center;color:var(--sub);font-size:.85rem}
 .cnt{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
 .ci{display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -46,7 +48,8 @@ input[type=text].memo{flex:1 1 14em;width:min(32em,100%);text-align:left}
 .cnt button{min-width:44px;padding:6px 0}
 .row{scroll-margin-bottom:100px}
 #stats{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
-#stats h2{font-size:1rem;margin:0 0 6px}
+#stats summary{cursor:pointer;font-weight:600}
+#stats[open] summary{margin-bottom:6px}
 #stats small{display:block;margin-top:6px;color:var(--sub);font-size:.75rem}
 .st{display:grid;grid-template-columns:auto 1fr auto;gap:2px 16px;font-size:.9rem;font-variant-numeric:tabular-nums}
 .st .r{text-align:right;font-weight:600}
@@ -82,14 +85,17 @@ input[type=text].memo{flex:1 1 14em;width:min(32em,100%);text-align:left}
 </head>
 <body>
 <main>
-<section id="counters" aria-label="カウンター"></section>
+<details id="cdet" open>
+  <summary>カウンター</summary>
+  <section id="counters" aria-label="カウンター"></section>
+</details>
 <ol id="list"></ol>
 <div class="empty" id="empty">「履歴を追加」を押すと行が追加されます</div>
-<section id="stats">
-  <h2>CZ pt別当選率</h2>
+<details id="stats" open>
+  <summary>CZ pt別当選率</summary>
   <div id="statsBody"></div>
   <small>各ptの当選数 ÷ そのpt以上の当選数（低ptで当選した分を除く）。CZ間実ゲーム数天井・アオハルCHANCEは除外。</small>
-</section>
+</details>
 <div class="btns"><button id="finish" type="button">終了</button><button id="clear" type="button">全消去</button></div>
 <section id="result" hidden>
   <img id="shot" alt="履歴一覧の画像">
@@ -241,6 +247,12 @@ const CKEY="aobuta-counts-v1";let counts={};
 try{counts=JSON.parse(localStorage.getItem(CKEY)||"{}")||{}}catch(e){counts={}}
 COUNTS.forEach(([k])=>{counts[k]=Math.max(0,parseInt(counts[k])||0)});
 const cbox=document.getElementById("counters"),cnum={},rateEls={},groups={};
+const cdet=document.getElementById("cdet");
+try{if(localStorage.getItem("aobuta-cdet")==="0")cdet.open=false}catch(e){}
+cdet.addEventListener("toggle",()=>{try{localStorage.setItem("aobuta-cdet",cdet.open?"1":"0")}catch(e){}});
+const sdet=document.getElementById("stats");
+try{if(localStorage.getItem("aobuta-sdet")==="0")sdet.open=false}catch(e){}
+sdet.addEventListener("toggle",()=>{try{localStorage.setItem("aobuta-sdet",sdet.open?"1":"0")}catch(e){}});
 function saveCounts(){try{localStorage.setItem(CKEY,JSON.stringify(counts))}catch(e){}}
 COUNTS.forEach(([k,name])=>{
   const n=el("span",{className:"n",textContent:counts[k]});cnum[k]=n;
@@ -315,10 +327,10 @@ $("finish").addEventListener("click",()=>{
   $("shot").src=canvas.toDataURL("image/png");
   $("save").hidden=!dl;
   $("note").textContent=dl?"":"この環境では保存ボタンを使えません。画像を長押し（右クリック）して保存してください。";
-  list.hidden=true;empty.hidden=true;document.querySelector(".btns").hidden=true;$("addbar").hidden=true;$("stats").hidden=true;$("counters").hidden=true;$("result").hidden=false;
+  list.hidden=true;empty.hidden=true;document.querySelector(".btns").hidden=true;$("addbar").hidden=true;$("stats").hidden=true;$("cdet").hidden=true;$("result").hidden=false;
 });
 $("back").addEventListener("click",()=>{
-  $("result").hidden=true;list.hidden=false;document.querySelector(".btns").hidden=false;$("addbar").hidden=false;$("stats").hidden=false;$("counters").hidden=false;renumber();
+  $("result").hidden=true;list.hidden=false;document.querySelector(".btns").hidden=false;$("addbar").hidden=false;$("stats").hidden=false;$("cdet").hidden=false;renumber();
 });
 $("save").addEventListener("click",()=>{
   if(!canvas||!dl)return;
